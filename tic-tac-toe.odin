@@ -2,11 +2,10 @@ package main
 
 import "core:log"
 import "vendor:raylib"
-import "core:math"
 
 screen_width :: 1920
 screen_height :: 1080
-move_per_second :: 180
+move_per_second : f32 : 180.0
 target_fps :: 60
 
 main :: proc() {
@@ -15,41 +14,27 @@ main :: proc() {
 	raylib.InitWindow(screen_width, screen_height, "Bouncy text!")
 	raylib.SetTargetFPS(target_fps)
 
-	img := raylib.ImageText("Congrats! You created your first window!", 48, raylib.DARKGRAY)
-	textTexture := raylib.LoadTextureFromImage(img)
-	log.debugf("img: %v", img)
-	iwidth := img.width
-	iheight := img.height
-	raylib.UnloadImage(img)
-	defer raylib.UnloadTexture(textTexture)
+    camera := raylib.Camera{ { 0.0, 0.0, 0.25 }, { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, 45.0, raylib.CameraProjection.PERSPECTIVE }
+	position := raylib.Vector3{ 0.0, 0.0, 0.0 }
 
-	dir_x:i32 = 1
-	dir_y:i32 = 1
-	x:i32 = 190
-	y:i32 = 200
-	background:u32 = 0
+	model := raylib.LoadModel("board.obj");
+	target := raylib.LoadRenderTexture(screen_width, screen_height)
 
 	for !raylib.WindowShouldClose() {
+		raylib.BeginTextureMode(target)       // Enable drawing to texture
+			raylib.ClearBackground(raylib.RAYWHITE)  // Clear texture background
+			raylib.BeginMode3D(camera)        // Begin 3d mode drawing
+				raylib.DrawModel(model, position, 0.1, raylib.WHITE)   // Draw 3d model with texture
+				raylib.DrawGrid(10, 1.0)     // Draw a grid
+			raylib.EndMode3D()                // End 3d mode drawing, returns to orthographic 2d mode
+		raylib.EndTextureMode()               // End drawing to texture (now we have a texture available for next passes)
+
 		raylib.BeginDrawing()
-			bg := raylib.ColorFromHSV(f32(background % 360), 1.0, 1.0)
-			raylib.ClearBackground(bg)
-			background += 3
-			raylib.DrawTexture(textTexture, x, y, raylib.DARKGRAY)
-			delta_x := i32(math.round(raylib.GetFrameTime()*f32(move_per_second*dir_x)))
-			delta_y := i32(math.round(raylib.GetFrameTime()*f32(move_per_second*dir_y)))
-			new_x := x + delta_x
-			new_y := y + delta_y
-			if (new_x + iwidth) < screen_width && new_x > 0 {
-				x = new_x
-			} else {
-				dir_x = -dir_x
-			}
-			if (new_y + iheight) < screen_height && new_y > 0 {
-				y = new_y
-			} else {
-				dir_y = -dir_y
-			}
+			raylib.ClearBackground(raylib.RAYWHITE)
+			raylib.DrawTextureRec(target.texture, raylib.Rectangle{ 0, 0, f32(target.texture.width), f32(-target.texture.height)}, raylib.Vector2{ 0, 0 }, raylib.WHITE)
 		raylib.EndDrawing()
 	}
+	raylib.UnloadRenderTexture(target)
+	raylib.UnloadModel(model)
 	raylib.CloseWindow()
 }
