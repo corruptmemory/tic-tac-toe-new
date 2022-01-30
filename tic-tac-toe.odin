@@ -22,6 +22,12 @@ Piece :: enum {
 	X,
 	O,
 }
+Search_Direction :: enum {
+	Up,
+	Down,
+	Left,
+	Right,
+}
 
 animating := true
 
@@ -164,30 +170,69 @@ game_over :: proc() -> bool {
 	return true
 }
 
-find_open_position :: proc(row: int, col: int, bias: int) {
-	cursor_position = row*3+col
-	if board_state[cursor_position] == .Empty {
-		return
-	}
+find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 	// try to find an open position on the current row
 	c := col
-	for remaining := 2; remaining > 0; remaining -= 1 {
-		if bias == -1 {
-			c = (c+2)%3
-		} else {
-			c = (c+1)%3
-		}
-		cursor_position = row*3 + c
-		if board_state[cursor_position] == .Empty {
-			return
-		}
+	r := row
+	switch direction {
+	case .Up:
+		cursor_position = ((r+2)%3)*3+c
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+c
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+	case .Down:
+		cursor_position = ((r+1)%3)*3+c
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+c
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+	case .Left:
+		cursor_position = r*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = r*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+	case .Right:
+		cursor_position = r*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = r*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+1)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+1)%3
+		if board_state[cursor_position] == .Empty do return
+		cursor_position = ((r+2)%3)*3+(c+2)%3
+		if board_state[cursor_position] == .Empty do return
 	}
-	cursor_position = ((row+1)%3)*3 + col
-	for remaining := 7; remaining > 0; remaining -= 1 {
-		if board_state[cursor_position] == .Empty {
-			return
+	if board_state[cursor_position] != .Empty {
+		for i in 0..<len(board_state) {
+			cursor_position = i
+			if board_state[cursor_position] == .Empty do return
 		}
-		cursor_position = (cursor_position + 1)%9
 	}
 }
 
@@ -259,17 +304,13 @@ main :: proc() {
 			col := cursor_position % 3
 			switch {
 				case raylib.IsKeyPressed(raylib.KeyboardKey.LEFT):
-					col = (col + 2)%3
-					find_open_position(row, col, -1)
+					find_open_position(row, col, .Left)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.RIGHT):
-					col = (col + 1)%3
-					find_open_position(row, col, 1)
+					find_open_position(row, col, .Right)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.DOWN):
-					row = (row + 1)%3
-					find_open_position(row, col, 1)
+					find_open_position(row, col, .Down)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.UP):
-					row = (row + 2)%3
-					find_open_position(row, col, 1)
+					find_open_position(row, col, .Up)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.SPACE):
 					if !game_over() {
 						cp := row*3+col
@@ -281,7 +322,7 @@ main :: proc() {
 								board_state[cp] = .O
 								current_player = .X
 						}
-						find_open_position(row, col, 1)
+						find_open_position(row, col, .Right)
 					}
 			}
 		} else {
