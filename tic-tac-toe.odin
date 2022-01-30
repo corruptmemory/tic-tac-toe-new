@@ -32,7 +32,11 @@ Search_Direction :: enum {
 animating := true
 
 winner : Piece = .Empty
+winning_col := -1
+winning_row := -1
+winning_diag := -1
 
+camera :raylib.Camera
 board: raylib.Model
 board_state: [9]Piece
 x_piece: raylib.Model
@@ -144,9 +148,19 @@ game_over :: proc() -> bool {
 		switch {
 		case x_rows[i] == 3 || x_cols[i] == 3:
 			winner = .X
+			if x_rows[i] == 3 {
+				winning_row = i
+			} else {
+				winning_col = i
+			}
 			return true
 		case o_rows[i] == 3 || o_cols[i] == 3:
 			winner = .O
+			if o_rows[i] == 3 {
+				winning_row = i
+			} else {
+				winning_col = i
+			}
 			return true
 		}
 	}
@@ -155,9 +169,11 @@ game_over :: proc() -> bool {
 		switch {
 		case x_diag[i] == 3:
 			winner = .X
+			winning_diag = i
 			return true
 		case o_diag[i] == 3:
 			winner = .O
+			winning_diag = i
 			return true
 		}
 	}
@@ -237,11 +253,47 @@ find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 }
 
 draw_game_over :: proc() {
-
+	if winning_col > -1 {
+		st := piece_positions[winning_col]
+		st[1] += 0.030
+		ed := piece_positions[winning_col+6]
+		ed[1] -= 0.030
+		sp := raylib.GetWorldToScreen(st, camera)
+		ep := raylib.GetWorldToScreen(ed, camera)
+		raylib.DrawLineEx(sp, ep, 20.0, raylib.GREEN)
+	} else if winning_row > -1 {
+		st := piece_positions[winning_row*3]
+		st[0] -= 0.030
+		ed := piece_positions[winning_row*3+2]
+		ed[0] += 0.030
+		sp := raylib.GetWorldToScreen(st, camera)
+		ep := raylib.GetWorldToScreen(ed, camera)
+		raylib.DrawLineEx(sp, ep, 20.0, raylib.GREEN)
+	} else if winning_diag > -1 {
+		st, ed: raylib.Vector3
+		switch winning_diag {
+		case 0:
+			st = piece_positions[0]
+			st[0] -= 0.030
+			st[1] += 0.030
+			ed = piece_positions[8]
+			ed[0] += 0.030
+			ed[1] -= 0.030
+		case 1:
+			st = piece_positions[2]
+			st[0] += 0.030
+			st[1] += 0.030
+			ed = piece_positions[6]
+			ed[0] -= 0.030
+			ed[1] -= 0.030
+		}
+		sp := raylib.GetWorldToScreen(st, camera)
+		ep := raylib.GetWorldToScreen(ed, camera)
+		raylib.DrawLineEx(sp, ep, 20.0, raylib.GREEN)
+	}
 }
 
 draw_board :: proc() {
-    camera := raylib.Camera{ { 0.0, 0.0, 0.25 }, { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, 45.0, raylib.CameraProjection.PERSPECTIVE }
 	position := raylib.Vector3{ 0.0, 0.0, 0.0 }
 
 	frame_time := raylib.GetFrameTime()
@@ -292,6 +344,7 @@ main :: proc() {
 	raylib.InitWindow(screen_width, screen_height, "Bouncy text!")
 	raylib.SetTargetFPS(target_fps)
 
+    camera = raylib.Camera{ { 0.0, 0.0, 0.25 }, { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, 45.0, raylib.CameraProjection.PERSPECTIVE }
 	board = raylib.LoadModel("board.obj");
 	x_piece = raylib.LoadModel("X.obj");
 	o_piece = raylib.LoadModel("O.obj");
@@ -335,6 +388,9 @@ main :: proc() {
 				current_player = .X
 				param = 0.0
 				animating = true
+				winning_col = -1
+				winning_row = -1
+				winning_diag = -1
 			}
 		}
 		draw_board()
