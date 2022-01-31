@@ -3,6 +3,8 @@ package main
 import "core:log"
 import "vendor:raylib"
 import "core:math"
+import "core:mem"
+import "core:c"
 
 screen_width :: 1920
 screen_height :: 1080
@@ -36,13 +38,18 @@ winning_col := -1
 winning_row := -1
 winning_diag := -1
 
-camera :raylib.Camera
+starfield: raylib.Shader
+iTime: c.int
+camera: raylib.Camera
 board: raylib.Model
 board_state: [9]Piece
 x_piece: raylib.Model
 o_piece: raylib.Model
 target: raylib.RenderTexture2D
+blank_texture: raylib.Texture2D
 current_player: Player = .X
+
+board_background:: raylib.Color{ 0, 0, 0, 200 }
 
 cursor_position : int = 0
 cursor_alpha : f32 = 1.0
@@ -297,6 +304,8 @@ draw_board :: proc() {
 	position := raylib.Vector3{ 0.0, 0.0, 0.0 }
 
 	frame_time := raylib.GetFrameTime()
+	itime := f32(raylib.GetTime())
+    raylib.SetShaderValue(starfield, raylib.ShaderLocationIndex(iTime), &itime, raylib.ShaderUniformDataType.FLOAT)
 	if animating {
 		param = min(param + frame_time*move_per_second, 1.0)
 		if param == 1.0 {
@@ -305,7 +314,7 @@ draw_board :: proc() {
 		position[2] = approach(param)
 	}
 	raylib.BeginTextureMode(target)       // Enable drawing to texture
-		raylib.ClearBackground(raylib.RAYWHITE)  // Clear texture background
+		raylib.ClearBackground(board_background)  // Clear texture background
 		raylib.BeginMode3D(camera)        // Begin 3d mode drawing
 			raylib.DrawModel(board, position, 0.2, raylib.RED)   // Draw 3d model with texture
 			draw_pieces()
@@ -316,8 +325,11 @@ draw_board :: proc() {
 	raylib.EndTextureMode()               // End drawing to texture (now we have a texture available for next passes)
 
 	raylib.BeginDrawing()
-		raylib.ClearBackground(raylib.RAYWHITE)
+		raylib.BeginShaderMode(starfield)
+			raylib.DrawTextureRec(blank_texture, raylib.Rectangle{ 0, 0, f32(blank_texture.width), f32(-blank_texture.height)}, raylib.Vector2{ 0, 0 }, raylib.WHITE)
+		raylib.EndShaderMode()
 		raylib.DrawTextureRec(target.texture, raylib.Rectangle{ 0, 0, f32(target.texture.width), f32(-target.texture.height)}, raylib.Vector2{ 0, 0 }, raylib.WHITE)
+
 		if !game_over() {
 			switch current_player {
 				case .X: raylib.DrawText("Player: X", 10, 10, 20, raylib.GRAY)
@@ -340,8 +352,7 @@ draw_board :: proc() {
 
 main :: proc() {
 	context.logger = log.create_console_logger()
-	log.debug("Hello from tic-tac-toe")
-	raylib.InitWindow(screen_width, screen_height, "Bouncy text!")
+	raylib.InitWindow(screen_width, screen_height, "-- COSMIC TIC-TAC-TOE --")
 	raylib.SetTargetFPS(target_fps)
 
     camera = raylib.Camera{ { 0.0, 0.0, 0.25 }, { 0.0, 0.0, 0.0 }, { 0.0, 1.0, 0.0 }, 45.0, raylib.CameraProjection.PERSPECTIVE }
@@ -349,6 +360,15 @@ main :: proc() {
 	x_piece = raylib.LoadModel("X.obj");
 	o_piece = raylib.LoadModel("O.obj");
 	target = raylib.LoadRenderTexture(screen_width, screen_height)
+	starfield = raylib.LoadShader(nil, "resources/shaders/starfield.fs")
+	blank := raylib.GenImageColor(screen_width, screen_height, raylib.BLANK)
+    blank_texture = raylib.LoadTextureFromImage(blank)
+    raylib.UnloadImage(blank)
+
+    iResolution := raylib.GetShaderLocation(starfield, "iResolution")
+    screen_dims := []f32{ f32(screen_width), f32(screen_height) }
+    raylib.SetShaderValue(starfield, raylib.ShaderLocationIndex(iResolution), mem.raw_data(screen_dims), raylib.ShaderUniformDataType.VEC2)
+    iTime = raylib.GetShaderLocation(starfield, "iTime")
 
 	for !raylib.WindowShouldClose() {
 		if raylib.IsKeyPressed(raylib.KeyboardKey.Q) do break
@@ -397,6 +417,7 @@ main :: proc() {
 	}
 
 	raylib.UnloadRenderTexture(target)
+	raylib.UnloadShader(starfield)
 	raylib.UnloadModel(board)
 	raylib.UnloadModel(x_piece)
 	raylib.UnloadModel(o_piece)
