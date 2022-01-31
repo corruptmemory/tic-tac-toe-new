@@ -39,6 +39,7 @@ winning_row := -1
 winning_diag := -1
 
 starfield: raylib.Shader
+board_and_pieces: raylib.Shader
 iTime: c.int
 camera: raylib.Camera
 board: raylib.Model
@@ -55,7 +56,7 @@ cursor_position : int = 0
 cursor_alpha : f32 = 1.0
 cursor_alpha_direction : f32 = -1.0
 cursor_move_per_second : f32 : 2.0
-cursor_base_color :: raylib.BLUE
+cursor_base_color :: raylib.Color{ 0, 60, 120, 255 }
 
 // animation values
 param : f32 = 0.0
@@ -361,14 +362,22 @@ main :: proc() {
 	o_piece = raylib.LoadModel("O.obj");
 	target = raylib.LoadRenderTexture(screen_width, screen_height)
 	starfield = raylib.LoadShader(nil, "resources/shaders/starfield.fs")
+	board_and_pieces = raylib.LoadShader("resources/shaders/piece_and_board.vs", "resources/shaders/piece_and_board.fs")
 	blank := raylib.GenImageColor(screen_width, screen_height, raylib.BLANK)
     blank_texture = raylib.LoadTextureFromImage(blank)
     raylib.UnloadImage(blank)
+    board.materials[0].shader = board_and_pieces
+    x_piece.materials[0].shader = board_and_pieces
+    o_piece.materials[0].shader = board_and_pieces
 
     iResolution := raylib.GetShaderLocation(starfield, "iResolution")
     screen_dims := []f32{ f32(screen_width), f32(screen_height) }
     raylib.SetShaderValue(starfield, raylib.ShaderLocationIndex(iResolution), mem.raw_data(screen_dims), raylib.ShaderUniformDataType.VEC2)
     iTime = raylib.GetShaderLocation(starfield, "iTime")
+
+    lightPos := raylib.GetShaderLocation(board_and_pieces, "lightPos")
+    light_pos := []f32{ 0.0, 0.0, 0.25 }
+    raylib.SetShaderValue(board_and_pieces, raylib.ShaderLocationIndex(lightPos), mem.raw_data(light_pos), raylib.ShaderUniformDataType.VEC3)
 
 	for !raylib.WindowShouldClose() {
 		if raylib.IsKeyPressed(raylib.KeyboardKey.Q) do break
@@ -417,6 +426,7 @@ main :: proc() {
 	}
 
 	raylib.UnloadRenderTexture(target)
+	raylib.UnloadShader(board_and_pieces)
 	raylib.UnloadShader(starfield)
 	raylib.UnloadModel(board)
 	raylib.UnloadModel(x_piece)
