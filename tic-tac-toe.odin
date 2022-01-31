@@ -403,17 +403,15 @@ main :: proc() {
 				case raylib.IsKeyPressed(raylib.KeyboardKey.UP):
 					find_open_position(row, col, .Up)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.SPACE):
-					if !game_over() {
-						switch current_player {
-							case .X:
-								board_state[cursor_position] = .X
-								current_player = .O
-							case .O:
-								board_state[cursor_position] = .O
-								current_player = .X
-						}
-						find_open_position(row, col, .Any)
+					switch current_player {
+						case .X:
+							board_state[cursor_position] = .X
+							current_player = .O
+						case .O:
+							board_state[cursor_position] = .O
+							current_player = .X
 					}
+					find_open_position(row, col, .Any)
 			}
 		} else {
 			if raylib.IsKeyPressed(raylib.KeyboardKey.R) do new_game()
