@@ -10,7 +10,7 @@ in vec3 fragNormal;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 uniform vec3 lightPos;
-uniform vec3 lightColor = vec3(0.2, 0.2, 0.2);
+uniform vec3 lightColor = vec3(0.3, 0.3, 0.3);
 
 // Output fragment color
 out vec4 finalColor;

@@ -25,6 +25,7 @@ Piece :: enum {
 	O,
 }
 Search_Direction :: enum {
+	Any,
 	Up,
 	Down,
 	Left,
@@ -50,7 +51,9 @@ target: raylib.RenderTexture2D
 blank_texture: raylib.Texture2D
 current_player: Player = .X
 
-board_background:: raylib.Color{ 0, 0, 0, 200 }
+board_background := raylib.Color{ 0, 0, 0, 200 }
+board_color := raylib.Color{ 200, 0, 0, 255 }
+piece_color := raylib.Color{ 80, 80, 80, 255 }
 
 cursor_position : int = 0
 cursor_alpha : f32 = 1.0
@@ -96,93 +99,79 @@ draw_pieces :: proc() {
 		switch p {
 			case .Empty:
 			case .X:
-				raylib.DrawModel(x_piece, piece_positions[i], 0.2, raylib.GRAY)
+				raylib.DrawModel(x_piece, piece_positions[i], 0.2, piece_color)
 			case .O:
-				raylib.DrawModel(o_piece, piece_positions[i], 0.2, raylib.GRAY)
+				raylib.DrawModel(o_piece, piece_positions[i], 0.2, piece_color)
 		}
 	}
 }
 
 game_over :: proc() -> bool {
-	x_rows: [3]int
-	x_cols: [3]int
-	o_rows: [3]int
-	o_cols: [3]int
-	x_diag: [2]int
-	o_diag: [2]int
+	X :: 0
+	O :: 1
+	rows: [2][3]int
+	cols: [2][3]int
+	diag: [2][2]int
+	piece: int
+
+	to_board_piece:: proc(p: int) -> Piece {
+		if p == X do return .X
+		return .O
+	}
 
 	for y in 0..2 {
 		for x in 0..2 {
 			p := y*3+x
 			switch board_state[p] {
 			case .Empty:
+				continue
 			case .X:
-				x_rows[y] += 1
-				x_cols[x] += 1
-				switch {
-				case y == 0 && x == 0:
-						x_diag[0] += 1
-				case y == 0 && x == 2:
-						x_diag[1] += 1
-				case y == 1 && x == 1:
-						x_diag[0] += 1
-						x_diag[1] += 1
-				case y == 2 && x == 0:
-						x_diag[1] += 1
-				case y == 2 && x == 2:
-						x_diag[0] += 1
-				}
+				piece = X
 			case .O:
-				o_rows[y] += 1
-				o_cols[x] += 1
-				switch {
-				case y == 0 && x == 0:
-						o_diag[0] += 1
-				case y == 0 && x == 2:
-						o_diag[1] += 1
-				case y == 1 && x == 1:
-						o_diag[0] += 1
-						o_diag[1] += 1
-				case y == 2 && x == 0:
-						o_diag[1] += 1
-				case y == 2 && x == 2:
-						o_diag[0] += 1
-				}
+				piece = O
+			}
+
+			rows[piece][y] += 1
+			cols[piece][x] += 1
+			switch {
+			case y == 0 && x == 0:
+					diag[piece][0] += 1
+			case y == 0 && x == 2:
+					diag[piece][1] += 1
+			case y == 1 && x == 1:
+					diag[piece][0] += 1
+					diag[piece][1] += 1
+			case y == 2 && x == 0:
+					diag[piece][1] += 1
+			case y == 2 && x == 2:
+					diag[piece][0] += 1
 			}
 		}
 	}
 
 	for i in 0..2 {
-		switch {
-		case x_rows[i] == 3 || x_cols[i] == 3:
-			winner = .X
-			if x_rows[i] == 3 {
+		for p in 0..O {
+			switch {
+			case rows[p][i] == 3:
+				winner = to_board_piece(p)
 				winning_row = i
-			} else {
+				return true
+			case cols[p][i] == 3:
+				winner = to_board_piece(p)
 				winning_col = i
+				return true
 			}
-			return true
-		case o_rows[i] == 3 || o_cols[i] == 3:
-			winner = .O
-			if o_rows[i] == 3 {
-				winning_row = i
-			} else {
-				winning_col = i
-			}
-			return true
 		}
 	}
 
 	for i in 0..1 {
-		switch {
-		case x_diag[i] == 3:
-			winner = .X
-			winning_diag = i
-			return true
-		case o_diag[i] == 3:
-			winner = .O
-			winning_diag = i
-			return true
+		for p in 0..O {
+			switch {
+			case diag[p][i] == 3:
+				winner = to_board_piece(p)
+				winning_diag = i
+				return true
+			}
 		}
 	}
 
@@ -195,62 +184,68 @@ game_over :: proc() -> bool {
 }
 
 find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
-	// try to find an open position on the current row
-	c := col
-	r := row
+	to :: proc(p, dp: int) -> int {
+		return (p+dp+3)%3
+	}
+	move_to :: proc(r, c, dr, dc: int) {
+		cursor_position = to(r,dr)*3 + to(c,dc)
+	}
+
 	switch direction {
 	case .Up:
-		cursor_position = ((r+2)%3)*3+c
+		move_to(row, col, -1, 0)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+c
+		move_to(row, col, -2, 0)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+2)%3
+		move_to(row, col, -1, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+1)%3
+		move_to(row, col, -1, 1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+2)%3
+		move_to(row, col, -2, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+1)%3
+		move_to(row, col, -2, 1)
 		if board_state[cursor_position] == .Empty do return
 	case .Down:
-		cursor_position = ((r+1)%3)*3+c
+		move_to(row, col, 1, 0)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+c
+		move_to(row, col, 2, 0)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+2)%3
+		move_to(row, col, 1, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+1)%3
+		move_to(row, col, 1, 1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+2)%3
+		move_to(row, col, 2, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+1)%3
+		move_to(row, col, 2, 1)
 		if board_state[cursor_position] == .Empty do return
 	case .Left:
-		cursor_position = r*3+(c+2)%3
+		move_to(row, col, 0, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = r*3+(c+1)%3
+		move_to(row, col, 0, -2)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+2)%3
+		move_to(row, col, -1, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+1)%3
+		move_to(row, col, 1, -1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+2)%3
+		move_to(row, col, -1, -2)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+1)%3
+		move_to(row, col, 1, -2)
 		if board_state[cursor_position] == .Empty do return
 	case .Right:
-		cursor_position = r*3+(c+1)%3
+		move_to(row, col, 0, 1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = r*3+(c+2)%3
+		move_to(row, col, 0, 2)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+1)%3
+		move_to(row, col, -1, 1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+1)%3)*3+(c+2)%3
+		move_to(row, col, 1, 1)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+1)%3
+		move_to(row, col, -1, 2)
 		if board_state[cursor_position] == .Empty do return
-		cursor_position = ((r+2)%3)*3+(c+2)%3
+		move_to(row, col, 1, 2)
 		if board_state[cursor_position] == .Empty do return
+	case .Any:
+		// We just fall through to the catch-all below
 	}
 	if board_state[cursor_position] != .Empty {
 		for i in 0..<len(board_state) {
@@ -312,12 +307,14 @@ draw_board :: proc() {
 		if param == 1.0 {
 			animating = false
 		}
+		board_alpha := math.lerp(f32(0.0), f32(200.0), param)
+		board_background.a = u8(board_alpha)
 		position[2] = approach(param)
 	}
 	raylib.BeginTextureMode(target)       // Enable drawing to texture
 		raylib.ClearBackground(board_background)  // Clear texture background
 		raylib.BeginMode3D(camera)        // Begin 3d mode drawing
-			raylib.DrawModel(board, position, 0.2, raylib.RED)   // Draw 3d model with texture
+			raylib.DrawModel(board, position, 0.2, board_color)   // Draw 3d model with texture
 			draw_pieces()
 			if !animating && !game_over() {
 				draw_cursor(frame_time)
@@ -349,7 +346,19 @@ draw_board :: proc() {
 	raylib.EndDrawing()
 }
 
-
+new_game :: proc() {
+	winner = .Empty
+	cursor_position = 0
+	for i in 0..<len(board_state) {
+		board_state[i] = .Empty
+	}
+	current_player = .X
+	param = 0.0
+	animating = true
+	winning_col = -1
+	winning_row = -1
+	winning_diag = -1
+}
 
 main :: proc() {
 	context.logger = log.create_console_logger()
@@ -376,7 +385,7 @@ main :: proc() {
     iTime = raylib.GetShaderLocation(starfield, "iTime")
 
     lightPos := raylib.GetShaderLocation(board_and_pieces, "lightPos")
-    light_pos := []f32{ 0.0, 0.0, 0.25 }
+    light_pos := []f32{ camera.position[0], camera.position[1], camera.position[2] }
     raylib.SetShaderValue(board_and_pieces, raylib.ShaderLocationIndex(lightPos), mem.raw_data(light_pos), raylib.ShaderUniformDataType.VEC3)
 
 	for !raylib.WindowShouldClose() {
@@ -395,32 +404,19 @@ main :: proc() {
 					find_open_position(row, col, .Up)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.SPACE):
 					if !game_over() {
-						cp := row*3+col
 						switch current_player {
 							case .X:
-								board_state[cp] = .X
+								board_state[cursor_position] = .X
 								current_player = .O
 							case .O:
-								board_state[cp] = .O
+								board_state[cursor_position] = .O
 								current_player = .X
 						}
-						find_open_position(row, col, .Right)
+						find_open_position(row, col, .Any)
 					}
 			}
 		} else {
-			if raylib.IsKeyPressed(raylib.KeyboardKey.R) {
-				winner = .Empty
-				cursor_position = 0
-				for i in 0..<len(board_state) {
-					board_state[i] = .Empty
-				}
-				current_player = .X
-				param = 0.0
-				animating = true
-				winning_col = -1
-				winning_row = -1
-				winning_diag = -1
-			}
+			if raylib.IsKeyPressed(raylib.KeyboardKey.R) do new_game()
 		}
 		draw_board()
 	}
