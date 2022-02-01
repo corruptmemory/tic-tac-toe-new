@@ -113,3 +113,24 @@ If you see a window that looks like:
 Then WOO HOO!
 
 If not: big brain time, and we wish you luck!  Better yet: send a PR to help folks out!
+
+## Playing the game
+
+This is still a work in progress, so everything is subject to change.  And yes, there are bugs!
+
+At the moment everything is keyboard driven:
+
+* `Arrow-keys`: move the piece around
+* `SPACE`: sets your piece and changes the piece
+* `Q`: Quits the game any time
+
+When the game is over:
+
+* `R`: Starts a new game
+
+## TODO:
+
+* Bug fixes
+* Add some sounds
+* Add mouse support
+* Some more bling
