@@ -118,7 +118,7 @@ If not: big brain time, and we wish you luck!  Better yet: send a PR to help fol
 
 This is still a work in progress, so everything is subject to change.  And yes, there are bugs!
 
-You can use the mouse of keyboard ... for now.
+You can use the mouse or keyboard ... for now.
 
 * `Q`: Quits the game any time
 
