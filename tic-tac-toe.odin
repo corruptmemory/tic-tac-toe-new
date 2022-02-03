@@ -3,13 +3,16 @@ package main
 import "core:log"
 import "vendor:raylib"
 import "core:math"
+import "core:math/rand"
 import "core:mem"
 import "core:c"
+import "core:time"
 
 screen_width :: 1920
 screen_height :: 1080
 move_per_second : f32 : 1.0
 target_fps :: 60
+board_line_thickness :: 0.025
 Player :: enum {
 	X,
 	O,
@@ -39,6 +42,7 @@ winning_col := -1
 winning_row := -1
 winning_diag := -1
 
+rng: rand.Rand
 starfield: raylib.Shader
 board_and_pieces: raylib.Shader
 iTime: c.int
@@ -50,6 +54,11 @@ o_piece: raylib.Model
 target: raylib.RenderTexture2D
 blank_texture: raylib.Texture2D
 current_player: Player = .X
+bounding_box: raylib.BoundingBox
+col_cut1, col_cut2: f32
+row_cut1, row_cut2: f32
+adjusted_board_line_thickness: f32
+active_cell: int = -1
 
 board_background := raylib.Color{ 0, 0, 0, 200 }
 board_color := raylib.Color{ 200, 0, 0, 255 }
@@ -195,11 +204,11 @@ find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 	case .Up:
 		move_to(row, col, -1, 0)
 		if board_state[cursor_position] == .Empty do return
-		move_to(row, col, -2, 0)
-		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -1, -1)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -1, 1)
+		if board_state[cursor_position] == .Empty do return
+		move_to(row, col, -2, 0)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -2, -1)
 		if board_state[cursor_position] == .Empty do return
@@ -208,11 +217,11 @@ find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 	case .Down:
 		move_to(row, col, 1, 0)
 		if board_state[cursor_position] == .Empty do return
-		move_to(row, col, 2, 0)
-		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, 1, -1)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, 1, 1)
+		if board_state[cursor_position] == .Empty do return
+		move_to(row, col, 2, 0)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, 2, -1)
 		if board_state[cursor_position] == .Empty do return
@@ -221,11 +230,11 @@ find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 	case .Left:
 		move_to(row, col, 0, -1)
 		if board_state[cursor_position] == .Empty do return
-		move_to(row, col, 0, -2)
-		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -1, -1)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, 1, -1)
+		if board_state[cursor_position] == .Empty do return
+		move_to(row, col, 0, -2)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -1, -2)
 		if board_state[cursor_position] == .Empty do return
@@ -234,11 +243,11 @@ find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 	case .Right:
 		move_to(row, col, 0, 1)
 		if board_state[cursor_position] == .Empty do return
-		move_to(row, col, 0, 2)
-		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -1, 1)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, 1, 1)
+		if board_state[cursor_position] == .Empty do return
+		move_to(row, col, 0, 2)
 		if board_state[cursor_position] == .Empty do return
 		move_to(row, col, -1, 2)
 		if board_state[cursor_position] == .Empty do return
@@ -248,10 +257,16 @@ find_open_position :: proc(row: int, col: int, direction: Search_Direction) {
 		// We just fall through to the catch-all below
 	}
 	if board_state[cursor_position] != .Empty {
+		options: [9]int
+		idx := 0
 		for i in 0..<len(board_state) {
-			cursor_position = i
-			if board_state[cursor_position] == .Empty do return
+			if board_state[i] == .Empty {
+				options[idx] = i
+				idx += 1
+			}
 		}
+		if idx == 0 do return
+		cursor_position = options[rand.int31_max(i32(idx), &rng)]
 	}
 }
 
@@ -296,6 +311,28 @@ draw_game_over :: proc() {
 	}
 }
 
+find_active_cell :: proc(collision: raylib.RayCollision) {
+	row := -1
+	col := -1
+	switch {
+	case collision.point[0] <= col_cut1:
+		col = 0
+	case collision.point[0] <= col_cut2:
+		col = 1
+	case:
+		col = 2
+	}
+	switch {
+	case collision.point[1] <= row_cut1:
+		row = 2
+	case collision.point[1] <= row_cut2:
+		row = 1
+	case:
+		row = 0
+	}
+	active_cell = row*3+col
+}
+
 draw_board :: proc() {
 	position := raylib.Vector3{ 0.0, 0.0, 0.0 }
 
@@ -303,6 +340,7 @@ draw_board :: proc() {
 	itime := f32(raylib.GetTime())
     raylib.SetShaderValue(starfield, raylib.ShaderLocationIndex(iTime), &itime, raylib.ShaderUniformDataType.FLOAT)
 	if animating {
+		active_cell = -1
 		param = min(param + frame_time*move_per_second, 1.0)
 		if param == 1.0 {
 			animating = false
@@ -310,6 +348,15 @@ draw_board :: proc() {
 		board_alpha := math.lerp(f32(0.0), f32(200.0), param)
 		board_background.a = u8(board_alpha)
 		position[2] = approach(param)
+	} else {
+		ray := raylib.GetMouseRay(raylib.GetMousePosition(), camera)
+		box_hit_info := raylib.GetRayCollisionBox(ray, bounding_box)
+		if box_hit_info.hit {
+			find_active_cell(box_hit_info)
+			if board_state[active_cell] == .Empty {
+				cursor_position = active_cell
+			}
+		}
 	}
 	raylib.BeginTextureMode(target)       // Enable drawing to texture
 		raylib.ClearBackground(board_background)  // Clear texture background
@@ -378,6 +425,19 @@ main :: proc() {
     board.materials[0].shader = board_and_pieces
     x_piece.materials[0].shader = board_and_pieces
     o_piece.materials[0].shader = board_and_pieces
+    bounding_box = raylib.GetModelBoundingBox(board)
+    bounding_box.min *= 0.2
+    bounding_box.max *= 0.2
+    board_width := bounding_box.max[0] - bounding_box.min[0]
+    board_height := bounding_box.max[1] - bounding_box.min[1]
+    cut_width := board_width/3.0
+    cut_height := board_height/3.0
+    col_cut1 = bounding_box.min[0] + cut_width
+    col_cut2 = col_cut1 + cut_width
+    row_cut1 = bounding_box.min[1] + cut_height
+    row_cut2 = row_cut1 + cut_height
+    adjusted_board_line_thickness = board_line_thickness * 0.2
+    rng = rand.create(u64(time.time_to_unix_nano(time.now())))
 
     iResolution := raylib.GetShaderLocation(starfield, "iResolution")
     screen_dims := []f32{ f32(screen_width), f32(screen_height) }
@@ -390,7 +450,7 @@ main :: proc() {
 
 	for !raylib.WindowShouldClose() {
 		if raylib.IsKeyPressed(raylib.KeyboardKey.Q) do break
-		if !game_over() {
+		if !game_over() && !animating {
 			row := cursor_position / 3
 			col := cursor_position % 3
 			switch {
@@ -402,7 +462,7 @@ main :: proc() {
 					find_open_position(row, col, .Down)
 				case raylib.IsKeyPressed(raylib.KeyboardKey.UP):
 					find_open_position(row, col, .Up)
-				case raylib.IsKeyPressed(raylib.KeyboardKey.SPACE):
+				case raylib.IsKeyPressed(raylib.KeyboardKey.SPACE) || raylib.IsMouseButtonPressed(raylib.MouseButton.LEFT):
 					switch current_player {
 						case .X:
 							board_state[cursor_position] = .X
