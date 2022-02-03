@@ -118,19 +118,69 @@ If not: big brain time, and we wish you luck!  Better yet: send a PR to help fol
 
 This is still a work in progress, so everything is subject to change.  And yes, there are bugs!
 
-At the moment everything is keyboard driven:
+You can use the mouse of keyboard ... for now.
+
+* `Q`: Quits the game any time
+
+Mouse:
+
+* Mouse over the space you want (if open)
+* Left click
+
+Current keyboard controls:
 
 * `Arrow-keys`: move the piece around
 * `SPACE`: sets your piece and changes the piece
-* `Q`: Quits the game any time
 
 When the game is over:
 
 * `R`: Starts a new game
 
+### Notes on keyboard inputs
+
+There are problems with using keyboard inputs in that directional movement is often ambiguous.
+Any kind of search for "something in the direction you want to look" has a bias of some kind.
+Whatever search you choose will have degenerate cases that are unintuitive.  For instance a board
+that looks like this:
+
+```
+* | X |
+---------
+X |   | O
+---------
+  | O |
+```
+
+Where the cursor is at the position marked with `*`.
+
+What space should be chosen when you hit the RIGHT ARROW?  The DOWN ARROW?
+
+My initial search would do a "depth-first" search that would try to stay in the same column or row
+relative to where the cursor is currently located.  This meant that it was impossible to navigate to
+the center spot in the board.
+
+The current logic will try to do its best to first look 1 column or row away (depending on what
+arrow key was pressed), which solves the above problem, but because whatever search you implement
+you're going to preferentially pick something when multiple options are available.
+
+Consider:
+
+```
+  | X |
+---------
+X | * | O
+---------
+  | O |
+```
+
+If I hit the RIGHT ARROW what open position should I pick?  No matter what I pick there is an
+argument that it could have been the other option.
+
+As a result of this I'm _strongly_ considering removing keyboard navigation completely.
+
 ## TODO:
 
 * Bug fixes
 * Add some sounds
-* Add mouse support
 * Some more bling
+* Some on-screen instructions would be useful
